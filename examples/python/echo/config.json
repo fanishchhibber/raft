@@ -1,0 +1,6 @@
+{ 
+    "echo_server_1": "./echo_server.py",
+    "echo_server_2": "./echo_server.py",
+    "echo_server_3": "./echo_server.py",
+    "echo_client": "./echo_client.py"
+}

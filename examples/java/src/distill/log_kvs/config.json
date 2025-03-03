@@ -1,0 +1,6 @@
+{ 
+    "S1": "./server",
+    "S2": "./server",
+    "S3": "./server",
+    "client": "./client"
+}

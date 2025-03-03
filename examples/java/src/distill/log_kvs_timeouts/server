@@ -1,0 +1,18 @@
+#!/bin/sh
+# if the environment flag DEBUG is set, each server is brought up in debug mode.
+# Once launched, one can attach to the running process from an IDE
+
+if [ -z  $DEBUG ]; then
+    java -ea distill.log_kvs_timeouts.Server $*
+else
+    port=5005
+    # setting up for remote debugging
+    if [[ "$*" == *"1"* ]]; then
+        port=5005
+    elif [[ "$*" == *"2"* ]]; then
+        port=5006
+    elif [[ "$*" == *"3"* ]]; then
+        port=5007
+    fi
+    java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:$port distill.log_kvs_timeouts.Server $*
+fi

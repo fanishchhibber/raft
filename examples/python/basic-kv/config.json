@@ -1,0 +1,5 @@
+{ 
+    "kv_server_1": "./kv_server.py",
+    "kv_server_2": "./kv_server.py",
+    "kv_client": "./kv_client.py"
+}

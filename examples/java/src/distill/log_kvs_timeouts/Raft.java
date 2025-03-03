@@ -112,9 +112,11 @@ public class Raft {
         
         // If the message contains no entries and our log is already at the right length,
         // this is just a heartbeat or a check that logs are equalized
-        if (msgEntries.length() == 0 && msgIndex == log.length()) {
+        if (msgEntries.isEmpty() && msgIndex == log.length()) {
             toSend = mkReply(msg, "success", true, "index", log.length());
-        } else if (msgIndex > log.length()) {
+        }
+        // TODO: Is this correct? OR validate on the commitIndex?
+        else if (msgIndex > log.length()) {
             // Ask leader to back up
             toSend = mkReply(msg, "success", false, "index", log.length());
         } else {
@@ -130,7 +132,8 @@ public class Raft {
                         log.put(entry);
                     }
                     toSend = mkReply(msg, "success", true, "index", log.length());
-                } else { // msgIndex < log.length()
+                } else {
+                    // msgIndex < log.length()
                     // chop tail until msgIndex, then add msgEntries
                     while (log.length() > msgIndex) {
                         log.remove(log.length() - 1);
@@ -149,7 +152,6 @@ public class Raft {
         if (!isLeader()) {
             numCommitted = (int) msg.get("num_committed");
             actions.add(onCommit());
-            // Reset ELECTION timer
             actions.add(new SetAlarm(Action.ELECTION));
         }
         
@@ -174,28 +176,8 @@ public class Raft {
     }
     
     boolean updateNumCommitted() {
-        // This method is called every time an append response comes, and
-        // we check to see how much of the log has been committed at all.
-        // if the number committed has changed, it returns true.
-
-        // This is how to
-        // Suppose the leader and followers' log lengths are as follows :
-        // [10, 5, 4, 8, 10].
-        //
-        // The last follower has caught up, but tht others are lagging. To find out the number
-        // of entries present in a majority of servers (that can be considered
-        // committed), we sort the list (in descending order), pick a quorum-sized
-        // slice from the top lengths, and use the last length (and smallest) element
-        // in this list.
-        // In this example, the sorted list is [10, 10, 8, 5, 4].
-        // The top quorum-sized slice is [10, 10, 8]
-        // 8 is the last and the smallest of this slice.
-        // Regardless of which triple combination is chosen, we are
-        // guaranteed that at least one server has 8 entries in its log.
-
         assert isLeader();
         
-        // Create a list of log lengths, including the leader's
         List<Integer> logLengths = new ArrayList<>();
         logLengths.add(log.length());
         
@@ -206,19 +188,14 @@ public class Raft {
             }
         }
         
-        // Sort in descending order
         logLengths.sort(Collections.reverseOrder());
-        
-        // If we don't have enough servers with known log lengths, we can't commit anything
+
         if (logLengths.size() < quorumSize) {
             return false;
         }
         
-        // Get the smallest log length in the quorum
         int newCommitted = logLengths.get(quorumSize - 1);
         
-        // Check if any of the entries in the log have the current term
-        // If not, we're in the testReplication test case and should not commit anything
         boolean hasCurrentTermEntry = false;
         for (int i = 0; i < log.length(); i++) {
             int entryTerm = log.getJSONObject(i).getInt("term");
@@ -228,12 +205,10 @@ public class Raft {
             }
         }
         
-        // If there are no entries with the current term, don't commit anything
         if (!hasCurrentTermEntry) {
             return false;
         }
         
-        // If the number of committed entries has increased, update and return true
         boolean changed = newCommitted > numCommitted;
         if (changed) {
             numCommitted = newCommitted;
@@ -324,12 +299,10 @@ public class Raft {
             boolean shouldSend = false;
             boolean useEmptyEntries = false;
             
-            // If the heartbeat timer has expired, we send a message anyway
             if (fi.heartbeatTimerExpired) {
                 shouldSend = true;
                 useEmptyEntries = !fi.isLogLengthKnown;
             }
-            // If a request is not pending and the follower is lagging, send a message
             else if (!fi.requestPending && fi.logLength < log.length()) {
                 shouldSend = true;
                 useEmptyEntries = !fi.isLogLengthKnown;
@@ -361,12 +334,8 @@ public class Raft {
         String name = msg.getString("name");
         
         if (name.equals(Action.ELECTION) && !isLeader()) {
-            // Election timeout and I am a follower
-            // In a real implementation, we would call becomeCandidate() here
-            // But for this exercise, we'll just reset the election timer
             actions.add(new SetAlarm(Action.ELECTION));
         } else if (isLeader()) {
-            // Heartbeat timeout and I am a leader
             FollowerInfo fi = followers.get(name);
             if (fi != null) {
                 fi.heartbeatTimerExpired = true;
@@ -381,15 +350,12 @@ public class Raft {
         var msgTerm = msg.getInt("term");
 
         if (msgTerm > term) {
-            // Upgrade my term
             term = msgTerm;
             
-            // If I am a leader, become a follower
             if (isLeader()) {
                 return becomeFollower();
             }
         } else if (msgTerm < term) {
-            // Ignore messages with lower terms
             return IGNORE_MSG;
         }
 
